@@ -62,7 +62,7 @@ python main.py  --cuda_id 0 --run_name 'test'  --dataset 'shanghai' --resolution
 The generated mobility data is saved in ``./gen_data/``
 
 
-## Demo to run the code
+## Demo to Run the Code
 
 We provide a test demo to illustrate the training process of the model. It only include a samll amount of data with only 1-epoch training. You will see the following logs once you start training our model:
 
