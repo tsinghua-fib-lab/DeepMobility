@@ -46,7 +46,7 @@ For example, to train a model for the Shanghai city, run:
 python main.py --cuda_id 0 --run_name 'test'  --dataset 'shanghai' --resolution 200 --lr 1e-4 --disc_lr 1e-4   --no_entropy_decay --actor_high_pretrain_epoch 200  --actor_low_pretrain_epoch 10 --uncertainty 2.0 --macro_coef 0.5  --with_evaluate --evaluate_batch 20000  --simulate_batch_size 128  --gail_batch_size 1024  --mode training
 ``
 
-you can also include some parameters related to the model in [Parameters](DeepMobility/ppo/arguments.py).
+you can also include some parameters related to the model in [Parameters](https://github.com/tsinghua-fib-lab/DeepMobility/blob/main/ppo/arguments.py).
 
 Once your model is trained, you will find the logs recording the training process in the  ``./tensorboard_log`` directory. The folder will be named as the start timne of the experiments. In the ``./ModelSave folder``, you will find the trained model named model_<epoch>.pkl and the generated synthetic data.
 
