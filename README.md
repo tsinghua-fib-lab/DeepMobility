@@ -1,6 +1,7 @@
 # DeepMobility
 
 This is the official implementation of the manuscript **Learning the complexity of urban mobility with deep generative collaboration network**.
+
 In this project, we introduce DeepMobility, a powerful deep generative collaboration network to bridge the
 heterogeneous behaviors of individuals and collective behaviors emerging from the entire population. Our model excels in learning the intricate data distribution and successfully reproduces the existing universal
 scaling laws that characterize human mobility behaviors at both the individual and population levels. It also exhibits
