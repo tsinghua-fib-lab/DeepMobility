@@ -58,4 +58,11 @@ For example, to generate the mobility data for the Shanghai city with a pre-trai
 python main.py  --cuda_id 0 --run_name 'test'  --dataset 'shanghai' --resolution 200 --generate_num 20000 --pretrained_model model.pkl --simulate_batch_size 128
 ``
 
+## Demo to run the code
+
+We provide a demo to illustrate the training process of the model:
+
+
+
+
 The generated mobility data is saved in ``./gen_data/``
