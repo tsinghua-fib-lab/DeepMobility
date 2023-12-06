@@ -54,10 +54,8 @@ class Embedding_Layer(nn.Module):
     def __init__(self, args, loc_emb=None, region_emb=None, device=None):
         super(Embedding_Layer, self).__init__()
 
-        
         self.embedding_region = nn.Embedding(args.total_regions+1, args.embedding_dim, padding_idx = args.total_regions)
         self.embedding_loc = nn.Embedding(args.total_locations+1, args.embedding_dim, padding_idx = args.total_locations)
-
 
         self.GRU_region = nn.GRU(args.embedding_dim, args.hidden_size, num_layers = 1, batch_first=True)
         self.GRU_loc = nn.GRU(args.embedding_dim * 2, args.hidden_size, num_layers = 1, batch_first=True)
@@ -70,7 +68,7 @@ class Embedding_Layer(nn.Module):
                 self.week_enc = nn.Embedding(7, int(args.embedding_dim/2))
 
 
-class Macro_critic(nn.Module): # 到底要不要和critic共享layer?
+class Macro_critic(nn.Module):
     def __init__(self, args, emb, device):
         init_ = lambda m: init(m, nn.init.orthogonal_, lambda x: nn.init.constant_(x, 0), np.sqrt(2))
         super(Macro_critic, self).__init__()
@@ -85,11 +83,13 @@ class Macro_critic(nn.Module): # 到底要不要和critic共享layer?
             self.critic = MLP(args.hidden_size + 2 * args.embedding_dim + int(0.5 * args.embedding_dim), args.hidden_size, 1, num_layers=args.macro_num_layers)
             self.week_enc = emb.week_enc
 
-
     def get_macro_value(self, inputs, length, length_reduce=None):
 
         if self.args.history_div != 0:
             assert length_reduce is not None
+
+        else:
+            length_reduce = length
 
         state, action = inputs
 
@@ -168,6 +168,9 @@ class Policy(nn.Module):
         if self.args.history_div!=0:
             assert length_reduce is not None
 
+        else:
+            length_reduce = length
+
         seq1, seq2 = inputs # N * L, N * L
         value_high, action_high, action_log_probs_high, uncertainty = self.policy_high.act(seq1,length, length_reduce)
         value_low, action_low, action_log_probs_low = self.policy_low.act((seq1, seq2, action_high),length, length_reduce)
@@ -209,10 +212,9 @@ class Policy_High(nn.Module):
         '''
         inputs: N * T, region-level trajector, for pretrain
         '''
-
         x = self.emb(inputs.long())
 
-        t_emb = self.t_enc((length % 24).long().to(self.device)) # 因为length已经提前加过1了……
+        t_emb = self.t_enc((length % 24).long().to(self.device)) # has already plus 1
         if self.args.is_week:
             week_emb = self.week_enc(((torch.tensor(length)-2) // 24 % 7).long().to(self.device))
         emb_state, _ = self.state_emb(x)
@@ -240,6 +242,7 @@ class Policy_High(nn.Module):
 
         packed = nn.utils.rnn.pack_padded_sequence(x, length_reduce, batch_first=True, enforce_sorted=False)
         _, h_n = self.state_emb(packed)
+
         emb_state = h_n.squeeze(dim=0) # N * hidden_size
 
         t_emb = self.t_enc(((torch.tensor(length)+1) % 24).long().to(self.device))
@@ -253,12 +256,10 @@ class Policy_High(nn.Module):
             value_multi = self.critic(torch.cat((emb_state,t_emb, week_emb),dim=-1)) # N * (hidden_size+embedding_dim)
 
         uncertainty = torch.var(value_multi, dim=-1, unbiased=False, keepdim=False) # N #limit in [0,1]
-        #uncertainty = torch.sigmoid(uncertainty)
         value = torch.mean(value_multi,dim=-1)
         mask_uncertainty = (uncertainty>self.args.uncertainty).float() # 0: individual, 1: gravity
 
         # individual preference
-        
         if not self.args.is_week:
             act_prob1 = F.softmax(self.actor_individual(torch.cat((emb_state,t_emb),dim=-1)),dim=-1)
         else:
@@ -279,7 +280,7 @@ class Policy_High(nn.Module):
         dist2 = torch.distributions.Categorical(act_prob2)
         action2 = dist2.sample()
         action2_log_probs = dist2.log_prob(action2)
-
+        
         assert mask_uncertainty.shape == action1.shape
         assert mask_uncertainty.shape == action2.shape
 
@@ -307,7 +308,7 @@ class Policy_High(nn.Module):
         t_emb = self.t_enc(((torch.tensor(length) + 1) % 24).long().to(self.device))
         if self.args.is_week:
             week_emb = self.week_enc(((torch.tensor(length)-1) // 24).long().to(self.device))
-        
+            
         if not self.args.is_week:
             value_multi = self.critic(torch.cat((emb_state,t_emb),dim=-1)) # N * num_heads
         else:
@@ -328,16 +329,18 @@ class Policy_High(nn.Module):
         if self.args.history_div != 0:
             assert length_reduce is not None
 
-        
+        else:
+            length_reduce = length
+
         x = self.emb(inputs.long()[:,-self.history_len:])
 
         packed = nn.utils.rnn.pack_padded_sequence(x, length_reduce, batch_first=True, enforce_sorted=False)
         test, h_n = self.state_emb(packed)
         emb_state = h_n.squeeze(dim=0) # N * hidden_size
 
-        t_emb = self.t_enc(((torch.tensor(length) + 1) % 24).long().to(self.device))
+        t_emb = self.t_enc(((length.clone() + 1) % 24).long().to(self.device))
         if self.args.is_week:
-            week_emb = self.week_enc(((torch.tensor(length)-1) // 24).long().to(self.device))
+            week_emb = self.week_enc(((length.clone()-1) // 24).long().to(self.device))
 
         if not self.args.is_week:
             value_multi = self.critic(torch.cat((emb_state,t_emb),dim=-1)) # N * num_heads
@@ -354,10 +357,10 @@ class Policy_High(nn.Module):
         dist1 = torch.distributions.Categorical(act_prob1)
         dist1_entropy = dist1.entropy().unsqueeze(dim=1)
 
-        t = (torch.tensor(length) // self.args.hour_agg  % (self.args.num_days * 24 / self.args.hour_agg) ).unsqueeze(dim=1).long().to(self.device)
+        # social interaction
+        t = (length.clone() // self.args.hour_agg  % (self.args.num_days * 24 / self.args.hour_agg) ).unsqueeze(dim=1).long().to(self.device)
 
-        #test = inputs[torch.arange(inputs.shape[0]),(torch.tensor(length)-1).long()]
-        out = F.relu(self.actor_others(inputs[torch.arange(inputs.shape[0]),(torch.tensor(length_reduce)-1).long()].unsqueeze(dim=1),t))+1e-7
+        out = F.relu(self.actor_others(inputs[torch.arange(inputs.shape[0]),(length_reduce.clone()-1).long()].unsqueeze(dim=1),t))+1e-7
         act_prob2 = out / torch.sum(out,dim=-1,keepdim=True)
         dist2 = torch.distributions.Categorical(act_prob2)
         dist2_entropy = dist2.entropy().unsqueeze(dim=1)
@@ -414,7 +417,6 @@ class Policy_Low(nn.Module):
         self.emb_region = emb.embedding_region
         self.emb_loc = emb.embedding_loc
 
-        
         self.state_emb = emb.GRU_loc
 
         self.critic = MLP(args.hidden_size, args.hidden_size, 1, num_layers=3).to(device)
@@ -465,7 +467,7 @@ class Policy_Low(nn.Module):
 
         value = self.critic(emb_s).squeeze(dim=1)
 
-
+        # attention mechanism
         candidate_loc = self.emb_loc(self.region2loc.to(self.device)[action_high.long()]) # N * N2 * embedding_size
         
         
@@ -512,7 +514,6 @@ class Policy_Low(nn.Module):
         if self.args.history_div != 0:
             assert length_reduce is not None
 
-
         x1, x2 = self.emb_region(s1)[:,-self.history_len:], self.emb_loc(s2)[:,-self.history_len:]
 
         x = torch.cat((x1,x2),dim=-1)
@@ -520,7 +521,6 @@ class Policy_Low(nn.Module):
         packed = nn.utils.rnn.pack_padded_sequence(x, length_reduce, batch_first=True, enforce_sorted=False)
 
         _, h_n = self.state_emb(packed)
-
 
         act_emb = self.emb_region(action_high)
 
@@ -548,7 +548,7 @@ class Policy_Low(nn.Module):
 
         if self.args.history_div != 0:
             assert length_reduce is not None
-
+        
         x1, x2 = self.emb_region(s1)[:,-self.history_len:], self.emb_loc(s2)[:,-self.history_len:]
 
         x = torch.cat((x1,x2),dim=-1)
@@ -601,6 +601,7 @@ class Policy_Low(nn.Module):
         dist = torch.distributions.Categorical(weight)
         dist_entropy = dist.entropy().mean()
 
+        # action id transformation
         action_low = action_low.unsqueeze(dim=1).expand(action_low.shape[0],weight.shape[-1])
         log_prob = torch.log(weight)
         index = (action_low==self.region2loc.to(self.device)[action_high.long()])
@@ -648,8 +649,6 @@ class DeepGravity(nn.Module):
 
         distance = torch.sqrt(torch.sum((o_loc-d_loc).pow(2),dim=-1, keepdim=True)) # N * D * 1
 
-        # distance = torch.zeros(distance.shape).to(self.device)
-
         t_emb = self.t_emb(t).expand(N,D,self.args.embedding_dim) # N * D * embedding_size
 
         d_feature = d_feature.unsqueeze(dim=0).expand(N, D, d_feature.shape[-1]) # N * D * d_feature
@@ -659,7 +658,6 @@ class DeepGravity(nn.Module):
         flow = self.gravity(od_feature).squeeze(dim=2) # N * D
 
         return flow
-
 
 
 

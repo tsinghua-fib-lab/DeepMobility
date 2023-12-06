@@ -26,10 +26,17 @@ def get_args():
     parser.add_argument('--training_num', type=int, default=20000)
     parser.add_argument('--long_days', type=int, default=0)
     parser.add_argument('--eval_dist', type=str, default='jsd')
+    parser.add_argument('--history_len', type=int, default=1e9)
+    parser.add_argument('--history_div', type=int, default=0, choices = [0,2,4,1000])
+
+    # emb learning
+    parser.add_argument('--emb_learn',action='store_true',default=False, help='')
+    parser.add_argument('--emb_epoch',type=int,default=1000, help='')
+
 
     # configurations
     parser.add_argument('--cuda_id',type=int,default=0, help='')
-    parser.add_argument('--dataset',type=str,default='shanghai', choices=['shanghai', 'beijing','shenzhen','Senegal'], required=True)
+    parser.add_argument('--dataset',type=str,default='shanghai', choices=['beijing','shenzhen','shanghai','Senegal'], required=True)
     parser.add_argument('--total_locations',type=int,default=None, help='number of locations')
     parser.add_argument('--total_regions',type=int,default=None, help='number of regions')
     parser.add_argument('--seed', type=int, default=6, help='random seed (default: 1)')
@@ -37,8 +44,8 @@ def get_args():
     parser.add_argument('--with_evaluate',action='store_true',default=False,help='')
     parser.add_argument('--model',type=str,default='', help='')
     parser.add_argument('--machine', type=str, required=True)
-    parser.add_argument('--resolution', type=str, required=True, choices = ['500','1000','10000'])
-    parser.add_argument('--param_resolution', type=str, required=True, choices = ['500','1000','10000'])
+    parser.add_argument('--resolution', type=str, required=True, choices = ['200','500','1000','10000'])
+    parser.add_argument('--param_resolution', type=str, required=True, choices = ['200','500','1000','10000'])
 
     # training parameters
     parser.add_argument('--simulate_batch_size', type=int,default = 128)
@@ -81,7 +88,6 @@ def get_args():
     parser.add_argument('--cooperative_interval',type=int,default=1,help='')
     parser.add_argument('--macro_num_layers',type=int,default=10,help='')
     
-
 
     # gravity
     parser.add_argument('--gravity_activation', type=str, default='relu', choices=['relu','tanh'])

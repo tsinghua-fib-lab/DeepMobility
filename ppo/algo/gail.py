@@ -5,7 +5,6 @@ import torch.nn.functional as F
 import torch.utils.data
 from torch import autograd
 from ppo.utils import init
-import mlflow
 from stable_baselines3.common.running_mean_std import RunningMeanStd
 
 
@@ -78,10 +77,12 @@ class Discriminator(nn.Module):
 
         act_emb = self.emb_high(action) # N * embedding_size
 
-        t_emb = self.t_enc(((torch.tensor(length) + 1) % 24).long().to(self.device))
+        length = torch.tensor(length).to(self.device)
 
-            if self.args.is_week:
-                week_emb = self.week_enc(((torch.tensor(length) - 1) // 24).long().to(self.device))
+        t_emb = self.t_enc(((length.clone() + 1) % 24).long())
+
+        if self.args.is_week:
+            week_emb = self.week_enc(((length.clone() - 1) // 24).long())
 
         if not self.args.is_week:
             d = self.proj_high(torch.cat([state_hidden.squeeze(dim=0), act_emb, t_emb], dim=-1))
@@ -102,11 +103,13 @@ class Discriminator(nn.Module):
 
         act_emb = self.emb_low(action)
 
-        temp = (torch.tensor(length) + 1) % 24
-        t_emb = self.t_enc(((torch.tensor(length) + 1) % 24).long().to(self.device))
+        length = torch.tensor(length).to(self.device)
+       
+        temp = (length.clone() + 1) % 24
+        t_emb = self.t_enc(((length.clone() + 1) % 24).long())
         if self.args.is_week:
-            week_emb = self.week_enc(((torch.tensor(length) - 1) // 24).long().to(self.device))
-    
+            week_emb = self.week_enc(((length.clone() - 1) // 24).long())
+        
         if not self.args.is_week:
             d = self.proj_low(torch.cat([state_hidden.squeeze(dim=0), act_emb,t_emb], dim=-1))
         else:
@@ -153,19 +156,15 @@ class Discriminator(nn.Module):
 
         return reward / np.sqrt(self.ret_rms_low.var[0] + 1e-8)
 
-    def update(self, expert_loader, rollouts, optimizer = None, level=0):
+    def update(self, expert_loader, rollouts, optimizer = None, level=0, writer=None, epoch = 0):
 
         self.train()
 
         assert level in [0,1]
 
-        # 几个batch的协调需要注意一下！
-
         policy_data_generator = rollouts.feed_forward_generator(None, mini_batch_size=self.args.gail_batch_size,level=0)
 
         loss_high, loss_low, correct_high, correct_low, num = 0.0, 0.0, 0.0, 0.0, 0.0
-
-        epoch = 0
 
         for expert_batch, policy_batch in zip(expert_loader, policy_data_generator):
 
@@ -175,6 +174,8 @@ class Discriminator(nn.Module):
 
             expert_state_high, expert_state_low, expert_action_high, expert_action_low, expert_length, expert_length_origin = expert_batch
             expert_length = expert_length.numpy().tolist()
+
+
 
             policy_high_d = self.forward_high(policy_state_high.to(self.device), policy_action_high.to(self.device),policy_length_origin, policy_length)
             policy_low_d = self.forward_low((policy_state_high.to(self.device), policy_state_low.to(self.device)), policy_action_low.to(self.device), policy_length_origin, policy_length)
@@ -218,9 +219,12 @@ class Discriminator(nn.Module):
 
             optimizer.step()
             
-        mlflow.log_metric('acc_high',correct_high/num,step=0)
-        mlflow.log_metric('acc_low',correct_low/num,step=0)
-        mlflow.log_metric('loss_disc_high',loss_high/num,step=0)
-        mlflow.log_metric('loss_disc_low',loss_low/num,step=0)
+        writer.add_scalar(tag='Discriminator/acc_high',scalar_value=correct_high/num, global_step=epoch)
+        writer.add_scalar(tag='Discriminator/acc_low',scalar_value=correct_low/num, global_step=epoch)
+        writer.add_scalar(tag='Discriminator/loss_disc_high',scalar_value=loss_high/num, global_step=epoch)
+        writer.add_scalar(tag='Discriminator/loss_disc_low',scalar_value=loss_low/num, global_step=epoch)
+
+
+
 
         return correct_high/num, correct_low/num

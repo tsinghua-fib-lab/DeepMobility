@@ -7,12 +7,14 @@ from bisect import bisect_right
 import json
 from scipy import stats
 import torch
+import torch.nn.functional as F
+from tqdm import tqdm
 import copy
-import mlflow
 import pickle
 import random
-import tqdm
+
 from utils import *
+
 
 def geodistance(lng1,lat1,lng2,lat2):
     lng1, lat1, lng2, lat2 = map(radians, [float(lng1), float(lat1), float(lng2), float(lat2)]) # 经纬度转换成弧度
@@ -23,79 +25,6 @@ def geodistance(lng1,lat1,lng2,lat2):
     distance=round(distance/1000,3)
     return distance
 
-
-
-class KS_test(object):
-    def __init__(self, args, LocIndex2lonlat, RegionIndex2lonlat):
-        self.args= args
-
-    def KS(p1,p2):
-        for user in p1:
-            t = []
-            for index, i in enumerate(user):
-                if index==0 or i!=t[-1]:
-                    t.append(i)
-            real.append(t)
-
-        for user in p2:
-            t = []
-            for index, i in enumerate(user):
-                if index==0 or i!=t[-1]:
-                    t.append(i)
-            fake.append(t)
-
-        # distance_step
-
-        f = [geodistance(self.LocIndex2lonlat[i][0],self.LocIndex2lonlat[i][1], self.LocIndex2lonlat[u[index]][0], self.LocIndex2lonlat[u[index]][1]) for u in fake for index, i in enumerate(u[1:])]
-        r = [geodistance(self.LocIndex2lonlat[i][0],self.LocIndex2lonlat[i][1], self.LocIndex2lonlat[u[index]][0], self.LocIndex2lonlat[u[index]][1]) for u in real for index, i in enumerate(u[1:])]
-
-        ks_step = stats.ks_2samp(f,r,alternative='two-sided')
-
-
-        f = [round(len(u)/self.args.num_days) for u in fake]
-        r = [round(len(u)/self.args.num_days) for u in real]
-
-        ks_dailyloc = stats.ks_2samp(f,r,alternative='two-sided')
-
-        f = [self.entropy(u) for u in fake]
-        r = [self.entropy(u) for u in real]
-
-        ks_entropy = stats.ks_2samp(f,r,alternative='two-sided')
-
-        real = [[self.LocIndex2lonlat[i] for i in u] for u in real]
-        fake = [[self.LocIndex2lonlat[i] for i in u] for u in fake]
-
-        def radius_cal(p):
-            c = np.mean(p,axis=0)
-            r = np.mean([geodistance(i[0],i[1],c[0],c[1]) for i in p])
-            return r
-
-        f = [round(radius_cal(np.array(u))) for u in fake]
-        r = [round(radius_cal(np.array(u))) for u in real]
-
-        ks_radius = stats.ks_2samp(f,r,alternative='two-sided')
-
-
-        real = []
-        fake = []
-
-        for user in p1:
-            t = []
-            for index, i in enumerate(user):
-                if index==0 or i!=t[-1][1]:
-                    t.append((index,i))
-            real += [(i[0]-t[ii][0]) for ii , i in enumerate(t[1:])]
-
-        for user in p2:
-            t = []
-            for index, i in enumerate(user):
-                if index==0 or i!=t[-1][1]:
-                    t.append((index,i))
-            fake += [(i[0]-t[ii][0]) for ii , i in enumerate(t[1:])]
-
-        ks_duration = stats.ks_2samp(fake,real,alternative='two-sided')
-
-        return  ks_step, ks_dailyloc,ks_entropy, ks_radius, ks_duration
 
 class Evaluation(object):
 
@@ -202,6 +131,8 @@ class Evaluation(object):
 
     def distance_jsd(self,p1,p2, loc_type = 'location'):
         
+        assert loc_type in ['location','region']
+
         real = []
         fake = []
 
@@ -221,9 +152,15 @@ class Evaluation(object):
 
         # distance_step
 
-        f = [geodistance(self.LocIndex2lonlat[i][0],self.LocIndex2lonlat[i][1], self.LocIndex2lonlat[u[index]][0], self.LocIndex2lonlat[u[index]][1]) for u in fake for index, i in enumerate(u[1:])]
-        r = [geodistance(self.LocIndex2lonlat[i][0],self.LocIndex2lonlat[i][1], self.LocIndex2lonlat[u[index]][0], self.LocIndex2lonlat[u[index]][1]) for u in real for index, i in enumerate(u[1:])]
+        if loc_type == 'location':
 
+            f = [geodistance(self.LocIndex2lonlat[i][0],self.LocIndex2lonlat[i][1], self.LocIndex2lonlat[u[index]][0], self.LocIndex2lonlat[u[index]][1]) for u in fake for index, i in enumerate(u[1:])]
+            r = [geodistance(self.LocIndex2lonlat[i][0],self.LocIndex2lonlat[i][1], self.LocIndex2lonlat[u[index]][0], self.LocIndex2lonlat[u[index]][1]) for u in real for index, i in enumerate(u[1:])]
+
+        elif loc_type == 'region':
+
+            f = [geodistance(self.RegionIndex2lonlat[i][0],self.RegionIndex2lonlat[i][1], self.RegionIndex2lonlat[u[index]][0], self.RegionIndex2lonlat[u[index]][1]) for u in fake for index, i in enumerate(u[1:])]
+            r = [geodistance(self.RegionIndex2lonlat[i][0],self.RegionIndex2lonlat[i][1], self.RegionIndex2lonlat[u[index]][0], self.RegionIndex2lonlat[u[index]][1]) for u in real for index, i in enumerate(u[1:])]
 
         MIN = self.min1
         MAX = self.max1
@@ -236,9 +173,13 @@ class Evaluation(object):
 
 
         # distance
-        f = [sum([geodistance(self.LocIndex2lonlat[i][0],self.LocIndex2lonlat[i][1], self.LocIndex2lonlat[u[index]][0], self.LocIndex2lonlat[u[index]][1]) for index, i in enumerate(u[1:])]) for u in fake]
-        r = [sum([geodistance(self.LocIndex2lonlat[i][0],self.LocIndex2lonlat[i][1], self.LocIndex2lonlat[u[index]][0], self.LocIndex2lonlat[u[index]][1]) for index, i in enumerate(u[1:])]) for u in real]
+        if loc_type == 'location':
+            f = [sum([geodistance(self.LocIndex2lonlat[i][0],self.LocIndex2lonlat[i][1], self.LocIndex2lonlat[u[index]][0], self.LocIndex2lonlat[u[index]][1]) for index, i in enumerate(u[1:])]) for u in fake]
+            r = [sum([geodistance(self.LocIndex2lonlat[i][0],self.LocIndex2lonlat[i][1], self.LocIndex2lonlat[u[index]][0], self.LocIndex2lonlat[u[index]][1]) for index, i in enumerate(u[1:])]) for u in real]
 
+        elif loc_type == 'region':
+            f = [sum([geodistance(self.RegionIndex2lonlat[i][0],self.RegionIndex2lonlat[i][1], self.RegionIndex2lonlat[u[index]][0], self.RegionIndex2lonlat[u[index]][1]) for index, i in enumerate(u[1:])]) for u in fake]
+            r = [sum([geodistance(self.RegionIndex2lonlat[i][0],self.RegionIndex2lonlat[i][1], self.RegionIndex2lonlat[u[index]][0], self.RegionIndex2lonlat[u[index]][1]) for index, i in enumerate(u[1:])]) for u in real]
 
         MIN = self.min2
         MAX = self.max2
@@ -337,34 +278,23 @@ class Evaluation(object):
         duration_jsd = self.duration_jsd(real,fake,loc_type)
 
         return distance_step_jsd, distance_jsd, radius_jsd, duration_jsd, dailyloc_jsd
-    
 
-def macro_metric(OD_fake,OD_real,step = 0):
+
+def macro_metric(OD_fake,OD_real,adj = 'time-1',step = 0, writer=None):
     '''input
     y_pred: N * N
     y_true: N * N
     '''
-
-    similarity = F.cosine_similarity(OD_fake.reshape(-1),OD_real.reshape(-1),dim=-1).double().item()
-
     mae = torch.mean(torch.abs(OD_fake - OD_real)).item()
 
     rmse = torch.sqrt(torch.sum((OD_fake - OD_real).pow(2))/OD_real.numel()).item()
 
     cpc = CPC(OD_fake.reshape(-1).numpy(),OD_real.reshape(-1).numpy())
 
-    smape = SMAPE(OD_fake.reshape(-1).numpy(),OD_real.reshape(-1).numpy())
-
-    nrmse = rmse/np.mean(OD_real.reshape(-1).numpy())
-
     value = pd.DataFrame([i for i in OD_real.reshape(-1).numpy().tolist()],columns = ['flow'])
-
     value = value['flow'].describe(percentiles = [0.2,0.4, 0.6, 0.8])
 
     percen = [0, value['20%'], value['40%'], value['60%'], value['80%'], value['max']]
-
-    mlflow.log_metrics({'Macro-{}-similarity'.format(adj):similarity,'Macro-{}-nrmse'.format(adj):nrmse,'Macro-{}-mae'.format(adj):mae,'Macro-{}-cpc'.format(adj):cpc},step=step)
-
 
     for i in range(5):
 
@@ -377,12 +307,11 @@ def macro_metric(OD_fake,OD_real,step = 0):
 
         cpc = CPC(fake.reshape(-1).numpy(),real.reshape(-1).numpy())
 
+        writer.add_scalar(tag='Evaluation/Macro-cpc-{}'.format(i+1), scalar_value=cpc,global_step=step)
+        #mlflow.log_metrics({'Macro-{}-cpc-{}'.format(adj,i+1):cpc},step=step)
 
-        mlflow.log_metrics({'Macro-{}-cpc-{}'.format(adj,i+1):cpc},step=step)
 
-
-
-def evaluate(init_prob, region2loc, loc2region, actor_critic, args, device, batch, evaluation, real_data_all, step, model_path = None, is_save=True):
+def evaluate(init_prob, region2loc, loc2region, actor_critic, args, device, batch, evaluation, real_data_all, step, model_path = None, is_save=True, writer=None):
 
     step_mlflow = step
 
@@ -437,40 +366,37 @@ def evaluate(init_prob, region2loc, loc2region, actor_critic, args, device, batc
             fake_s2 += state2.detach().cpu().numpy().tolist()
 
 
-    gen_data = [[(fake_s2[user_index][index], fake_s1[user_index][index]) for index in range(len(fake_s1[user_index]))] for user_index in range(len(fake_s1))]
-    f = open(model_path+'gen_data_{}.pkl'.format(step_mlflow),'wb')
-    pickle.dump(gen_data,f)
-
+    if is_save:
+        gen_data = [[(fake_s2[user_index][index], fake_s1[user_index][index]) for index in range(len(fake_s1[user_index]))] for user_index in range(len(fake_s1))]
+        f = open(model_path+'gen_data_{}.pkl'.format(step_mlflow),'wb')
+        pickle.dump(gen_data,f)
 
     real_data = random.sample(real_data_all, batch)
 
     real_s1 = [[i[2] for i in user] for user in real_data]
     real_s2 = [[i[1] for i in user] for user in real_data]
 
-    if args.eval_dist == 'jsd':
-        distance_step_jsd, distance_jsd, radius_jsd, duration_jsd, dailyloc_jsd = evaluation.get_JSD(real_s2,fake_s2, loc_type='location')
-        mlflow.log_metrics({'jsd_location_distacne_step':distance_step_jsd, 'jsd_location_distance':distance_jsd,'jsd_location_radius':radius_jsd, 'jsd_location_duration':duration_jsd, 'jsd_location_dailyloc':dailyloc_jsd},step=step_mlflow)
-
-    elif args.eval_dist == 'ks':
-        ks_step, ks_dailyloc,ks_entropy, ks_radius, ks_duration = evaluation.KS_test(real_s2,fake_s2)
-        mlflow.log_metrics({'ks_step':ks_step,'ks_dailyloc':ks_dailyloc,'ks_entropy':ks_entropy,'ks_radius':ks_radius,'ks_duration':ks_duration})
-
+    distance_step_jsd, distance_jsd, radius_jsd, duration_jsd, dailyloc_jsd = evaluation.get_JSD(real_s2,fake_s2, loc_type='location')
+    #mlflow.log_metrics({'jsd_location_distacne_step':distance_step_jsd, 'jsd_location_distance':distance_jsd,'jsd_location_radius':radius_jsd, 'jsd_location_duration':duration_jsd, 'jsd_location_dailyloc':dailyloc_jsd},step=step_mlflow)
+    writer.add_scalar(tag='Evaluation/distance_step_jsd', scalar_value=distance_step_jsd,global_step=step)
+    writer.add_scalar(tag='Evaluation/distance_jsd', scalar_value=distance_jsd,global_step=step)
+    writer.add_scalar(tag='Evaluation/radius_jsd', scalar_value=radius_jsd,global_step=step)
+    writer.add_scalar(tag='Evaluation/duration_jsd', scalar_value=duration_jsd,global_step=step)
+    writer.add_scalar(tag='Evaluation/dailyloc_jsd', scalar_value=dailyloc_jsd,global_step=step)
     actor_critic.train()
 
     return distance_step_jsd, distance_jsd, radius_jsd, duration_jsd, dailyloc_jsd
 
-def evaluate_macro(init_prob, region2loc, loc2region, actor_critic, args, device, OD_real_origin, model_path,  step, total_num=300000):
+def evaluate_macro(init_prob, region2loc, loc2region, actor_critic, args, device, OD_real_origin, model_path,  step, total_num=300000, is_save=False, writer=None):
 
     step_mlflow = step
 
-    OD_fake = torch.zeros(OD_real_origin.shape) 
+    batch_size = 5000
+
+    OD_fake = torch.zeros(OD_real_origin.shape) # 7 * 4 * 131 * 131
 
     gen_state_1 = []
     gen_state_2 = []
-
-    actor_critic.eval()
-
-    batch_size = 3
 
     with torch.no_grad():
 
@@ -478,11 +404,11 @@ def evaluate_macro(init_prob, region2loc, loc2region, actor_critic, args, device
 
             state1, state2, state = init_loc(args, init_prob, region2loc, loc2region, device, batch_size)
 
-            length = [1] * args.simulate_batch_size
+            length = [1] * batch_size
             length_origin = length
 
             for step in range(args.num_steps):
-                
+
                 # Sample actions
                 value_high, action_high, action_log_probs_high, uncertainty, value_low, action_low, action_log_probs_low = actor_critic.act(state,length_origin, length)
 
@@ -513,9 +439,12 @@ def evaluate_macro(init_prob, region2loc, loc2region, actor_critic, args, device
             with torch.cuda.device("cuda:{}".format(args.cuda_id)):
                 torch.cuda.empty_cache()
 
-    np.save(model_path+'OD_fake_{}.npy'.format(step_mlflow),OD_fake)
+    if is_save:
+        np.save(model_path+'OD_fake_{}.npy'.format(step_mlflow),OD_fake)
 
     OD_real = OD_real_origin * total_num/args.user_num
+
+    OD_fake, OD_real = torch.sum(torch.sum(OD_fake,dim=0),dim=0), torch.sum(torch.sum(OD_real,dim=0),dim=0)
 
     OD_fake_total = copy.deepcopy(OD_fake)
     OD_real_total = copy.deepcopy(OD_real)
@@ -527,7 +456,7 @@ def evaluate_macro(init_prob, region2loc, loc2region, actor_critic, args, device
     OD_fake_total = OD_fake_total[torch.where(OD_real_total>0)]
     OD_real_total = OD_real_total[torch.where(OD_real_total>0)]
 
-    macro_metric(OD_fake_total, OD_real_total,step = step_mlflow)
+    macro_metric(OD_fake_total, OD_real_total,'3',step = step_mlflow,writer=writer)
 
     actor_critic.train()
 

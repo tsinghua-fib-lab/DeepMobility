@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from tqdm import tqdm
-import mlflow
 import copy
 import math
 import os
@@ -24,7 +23,8 @@ class PPO():
                  macro_lr = None, 
                  eps=None,
                  max_grad_norm=None,
-                 use_clipped_value_loss=True):
+                 use_clipped_value_loss=True,
+                 writer = None):
 
         self.actor_critic = actor_critic
         self.macro_critic = macro_critic
@@ -44,6 +44,8 @@ class PPO():
         self.optimizer = optim.Adam(actor_critic.parameters(), lr=lr, eps=eps)
         self.macro_critic_optimizer = optim.Adam(macro_critic.parameters(), lr=macro_lr, eps=eps)
         self.macro_lr = macro_lr
+
+        self.writer = writer
 
     def update_macro_critic(self, rollouts, model_path):
         with torch.cuda.device("cuda:{}".format(rollouts.args.cuda_id)):
@@ -149,10 +151,14 @@ class PPO():
                             print(torch.isnan(return_batch).any(), torch.isnan(value_macro).any())
                             exit()
 
+
             with torch.cuda.device("cuda:{}".format(rollouts.args.cuda_id)):
                 torch.cuda.empty_cache()
 
-            mlflow.log_metric('loss_macro',macro_loss_all/num,step=0)
+            #mlflow.log_metric('loss_macro',macro_loss_all/num,step=0)
+            self.writer.add_scalar(tag='actor-critic/loss_macro',scalar_value=macro_loss_all/num)
+
+
 
         shutil.rmtree(model_path+'state_save')
         os.mkdir(model_path+'state_save')
@@ -168,7 +174,8 @@ class PPO():
 
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-9)
 
-        mlflow.log_metric('reward_positive', torch.mean((rollouts.rewards_high >= 0).float()).item(),step=0)
+        #mlflow.log_metric('reward_positive', torch.mean((rollouts.rewards_high >= 0).float()).item(),step=0)
+        self.writer.add_scalar(tag='actor-critic/reward_positive',scalar_value=torch.mean((rollouts.rewards_high >= 0).float()).item())
 
         for _ in range(self.ppo_epoch):
 
@@ -247,21 +254,34 @@ class PPO():
 
             if flag==0:
                 if level==0:
-                    mlflow.log_metric('loss_ppo_high_value', value_loss_epoch/num,step=0)
-                    mlflow.log_metric('loss_ppo_high_action',action_loss_epoch/num,step=0)
-                    mlflow.log_metric('loss_ppo_high_entropy',dist_entropy_epoch/num_b,step=0)
+                    # mlflow.log_metric('loss_ppo_high_value', value_loss_epoch/num,step=0)
+                    # mlflow.log_metric('loss_ppo_high_action',action_loss_epoch/num,step=0)
+                    # mlflow.log_metric('loss_ppo_high_entropy',dist_entropy_epoch/num_b,step=0)
+
+                    self.writer.add_scalar(tag='actor-critic/loss_ppo_high_value',scalar_value=value_loss_epoch/num)
+                    self.writer.add_scalar(tag='actor-critic/loss_ppo_high_action',scalar_value=action_loss_epoch/num)
+                    self.writer.add_scalar(tag='actor-critic/loss_ppo_high_entropy',scalar_value=dist_entropy_epoch/num_b)
+
+                    
 
                 elif level==1:
-                    mlflow.log_metric('loss_ppo_low_value', value_loss_epoch/num,step=0)
-                    mlflow.log_metric('loss_ppo_low_action',action_loss_epoch/num,step=0)
-                    mlflow.log_metric('loss_ppo_low_entropy',dist_entropy_epoch/num_b,step=0)
+                    # mlflow.log_metric('loss_ppo_low_value', value_loss_epoch/num,step=0)
+                    # mlflow.log_metric('loss_ppo_low_action',action_loss_epoch/num,step=0)
+                    # mlflow.log_metric('loss_ppo_low_entropy',dist_entropy_epoch/num_b,step=0)
+                    self.writer.add_scalar(tag='actor-critic/loss_ppo_low_value',scalar_value=value_loss_epoch/num)
+                    self.writer.add_scalar(tag='actor-critic/loss_ppo_low_action',scalar_value=action_loss_epoch/num)
+                    self.writer.add_scalar(tag='actor-critic/loss_ppo_low_entropy',scalar_value=dist_entropy_epoch/num_b)
 
             elif flag==1:
-                mlflow.log_metric('loss_ppo_cooperative_action',action_loss_epoch/num,step=0)
-                mlflow.log_metric('loss_ppo_cooperative_entropy',dist_entropy_epoch/num_b,step=0)
+                # mlflow.log_metric('loss_ppo_cooperative_action',action_loss_epoch/num,step=0)
+                # mlflow.log_metric('loss_ppo_cooperative_entropy',dist_entropy_epoch/num_b,step=0)
+                self.writer.add_scalar(tag='actor-critic/lloss_ppo_cooperative_action',scalar_value=action_loss_epoch/num)
+                self.writer.add_scalar(tag='actor-critic/loss_ppo_cooperative_entropy',scalar_value=dist_entropy_epoch/num_b)
+                
 
             elif flag==2:
-                mlflow.log_metric('loss_ppo_high_value', value_loss_epoch/num,step=0)
+                #mlflow.log_metric('loss_ppo_high_value', value_loss_epoch/num,step=0)
+                self.writer.add_scalar(tag='actor-critic/loss_ppo_high_value',scalar_value=value_loss_epoch/num)
 
         if not rollouts.args.no_entropy_decay:
             self.entropy_coef *= 0.5

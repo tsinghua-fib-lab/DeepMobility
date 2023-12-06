@@ -6,7 +6,6 @@ import math
 import pickle
 import numpy as np
 import pandas as pd
-import mlflow
 
 def init_loc(args, init_prob, region2loc, loc2region, device, batch):
     select_region = np.random.choice(np.arange(args.total_regions), size = batch, p = init_prob)
@@ -55,40 +54,16 @@ class RolloutStorage(object):
         self.step = 0
         self.Dict_hour = {}
 
-        if self.args.hour_agg==4:
-            for i in range(24):
-                if i>=2 and i<6:
-                    self.Dict_hour[i] = 0
-                elif i>=6 and i<10:
-                    self.Dict_hour[i] = 1
-                elif i>=10 and i<14:
-                    self.Dict_hour[i] = 2
-                elif i>=14 and i<18:
-                    self.Dict_hour[i] = 3
-                elif i>=18 and i<22:
-                    self.Dict_hour[i] = 4
-                else:
-                    self.Dict_hour[i] = 5
+        for i in range(24):
+            if i>=0 and i<6:
+                self.Dict_hour[i] = 0
+            elif i>=6 and i<12:
+                self.Dict_hour[i] = 1
+            elif i>=12 and i<18:
+                self.Dict_hour[i] = 2
+            else:
+                self.Dict_hour[i] = 3
 
-        elif self.args.hour_agg==6:
-            for i in range(24):
-                if i>=0 and i<6:
-                    self.Dict_hour[i] = 0
-                elif i>=6 and i<12:
-                    self.Dict_hour[i] = 1
-                elif i>=12 and i<18:
-                    self.Dict_hour[i] = 2
-                else:
-                    self.Dict_hour[i] = 3
-
-        elif self.args.hour_agg==24:
-            for i in range(24):
-                self.Dict_hour[i]=0
-
-        elif self.args.hour_agg==2:
-            for i in range(12):
-                self.Dict_hour[2*i] = i
-                self.Dict_hour[2*i+1] = i
  
     def after_update(self, level):
         '''
@@ -138,6 +113,8 @@ class RolloutStorage(object):
         self.length[self.step].copy_(length.unsqueeze(dim=1))
         self.step += 1
 
+
+
     def compute_returns(self,next_value_high, next_value_low, next_value_macro = None):
 
         self.value_preds_high[-1] = next_value_high.unsqueeze(dim=1)
@@ -177,7 +154,7 @@ class RolloutStorage(object):
                 for step in range(self.args.num_steps):
                     
                     # Sample actions
-                    value_high, action_high, action_log_probs_high, uncertainty, value_low, action_low, action_log_probs_low = actor_critic.act(state,length)
+                    value_high, action_high, action_log_probs_high, uncertainty, value_low, action_low, action_log_probs_low = actor_critic.act(state,length,length)
 
                     value_macro = macro_critic.get_macro_value((state1, action_high), length)
 
@@ -257,34 +234,18 @@ class RolloutStorage(object):
 
         self.reward_record = real_OD - self.OD_flow
 
-        if itr >0 :
-            mlflow.log_metric('last_min_flow',self.reward_record[self.last_min_index[0],self.last_min_index[1],self.last_min_index[2]].item())
-            mlflow.log_metric('last_max_flow',self.reward_record[self.last_max_index[0],self.last_max_index[1],self.last_max_index[2]].item())    
-            mlflow.log_metric('last_min_value',self.value_macro_save[self.last_min_index[0],self.last_min_index[1],self.last_min_index[2]].item())
-            mlflow.log_metric('last_max_value',self.value_macro_save[self.last_max_index[0],self.last_max_index[1],self.last_max_index[2]].item())
-
         index = torch.argmin(self.reward_record).item()
         flow, o, d = int(index // (self.args.total_regions)**2), int(index % (self.args.total_regions)**2 // self.args.total_regions), int(index % self.args.total_regions)
-        mlflow.log_metric('min_flow',self.reward_record[flow,o,d].item())
-        mlflow.log_metric('min_flow_index1',flow)
-        mlflow.log_metric('min_flow_index2',o)
-        mlflow.log_metric('min_flow_index3',d)
-        mlflow.log_metric('min_flow_index',index)
-        mlflow.log_metric('min_value',self.value_macro_save[flow,o,d].item())
+        
 
         self.last_min_index = (flow, o, d)
 
         index = torch.argmax(self.reward_record).item()
         flow, o, d = int(index // (self.args.total_regions)**2), int(index % (self.args.total_regions)**2 // self.args.total_regions), int(index % self.args.total_regions)
-        mlflow.log_metric('max_flow',self.reward_record[flow,o,d].item())
-        mlflow.log_metric('max_flow_index1',flow)
-        mlflow.log_metric('max_flow_index2',o)
-        mlflow.log_metric('max_flow_index3',d)
-        mlflow.log_metric('max_flow_index',index)
-        mlflow.log_metric('max_value',self.value_macro_save[flow,o,d].item())
-
+        
 
         self.last_max_index = (flow, o, d)
+
 
     def feed_forward_value(self, mini_batch_size, model_path,first = True):
 
@@ -318,6 +279,7 @@ class RolloutStorage(object):
             # batch_size * max_len * 335
             yield return_batch, action_batch, state_batch
 
+       
 
 
     def feed_forward_generator(self, advantages, num_mini_batch=None, mini_batch_size=None, level=0, drop=True):
@@ -362,7 +324,7 @@ class RolloutStorage(object):
             state1 = [self.state_high[ind[0]][ind[1]] for ind in indices]
             state2 = [self.state_low[ind[0]][ind[1]] for ind in indices]
 
-            # 需要padding
+            # padding
             max_len = max([len(i) for i in state1])
 
             length = [len(i) for i in state1]
