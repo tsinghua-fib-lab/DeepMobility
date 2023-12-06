@@ -58,11 +58,13 @@ For example, to generate the mobility data for the Shanghai city with a pre-trai
 python main.py  --cuda_id 0 --run_name 'test'  --dataset 'shanghai' --resolution 200 --generate_num 20000 --pretrained_model model.pkl --simulate_batch_size 128
 ``
 
-## Demo to run the code
-
-We provide a demo to illustrate the training process of the model:
-
-
-
 
 The generated mobility data is saved in ``./gen_data/``
+
+
+## Demo to run the code
+
+We provide a test demo to illustrate the training process of the model. It only include a samll amount of data with only 1-epoch training. You will see the following logs once you start training our model:
+
+[demo vedio](https://github.com/tsinghua-fib-lab/DeepMobility/blob/main/video/demo.mp4)
+
