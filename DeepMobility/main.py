@@ -19,7 +19,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from ppo import algo, utils
 from ppo import get_args
-from ppo import Policy, Embedding_Layer, Macro_critic
+from ppo import DeepMobility, Embedding_Layer, Macro_critic
 from ppo import RolloutStorage
 from DataLoader import DataLoader
 from Pretrain import pretrain_together
@@ -28,11 +28,14 @@ from Evaluation import Evaluation
 import setproctitle
 from utils import *
 from train import DeepMobility_train
+import warnings
+
+warnings.filterwarnings('ignore')
 
 
 def main(args, TIME):
     
-    print('Experiment setup...')
+    print('\nExperiment test demo setup...\n'.format(TIME))
 
     model_path = './ModelSave/{}/'.format(TIME)
 
@@ -57,10 +60,10 @@ def main(args, TIME):
     
     expert_state_action = dataloader.ExpertDataset(data)
 
-    print('Model setup...')
+    print('Model setup...\n')
     embedding_layer = Embedding_Layer(args).to(device)
     macro_critic = Macro_critic(args, embedding_layer, device).to(device)
-    actor_critic = Policy(args,embedding_layer, region2loc, region_att, loclonlat, device, history_len=args.history_len).to(device)
+    actor_critic = DeepMobility(args,embedding_layer, region2loc, region_att, loclonlat, device, history_len=args.history_len).to(device)
     discriminator = algo.Discriminator(args, embedding_layer,device).to(device)
 
     agent = algo.PPO(

@@ -61,7 +61,7 @@ def get_args():
     parser.add_argument('--disc_interval', type=int,default=1)
 
     # evaluate
-    parser.add_argument('--evaluate_epoch', type=int, default=50, help='')
+    parser.add_argument('--evaluate_interval', type=int, default=10, help='')
     parser.add_argument('--evaluate_batch', type=int, default=20000, help='')
     parser.add_argument('--total_OD_num', type=int, default=300000, help='')
    
@@ -80,7 +80,7 @@ def get_args():
     parser.add_argument('--value_agg', type=str, default='sum', choices=['sum', 'mean'], help='aggregation for micro values in a macro grid')
     parser.add_argument('--loss_type', type=str, default='error', choices=['relative', 'sigmoid-relative','sigmoid-abs','error','abs-error','abs-relative'])
     parser.add_argument('--macro_level', type=str, default='od', choices=['od','o'], help='user od samples or o samples for macro critic optimization')
-    parser.add_argument('--macro_coef', type=float, default=0.0, help='coefficient of the macro value')
+    parser.add_argument('--macro_coef', type=float, default=0.5, help='coefficient of the macro value')
     parser.add_argument('--macro_interval', type=int, default=5, help='')
     parser.add_argument('--macro_num', type=int, default=10000, help='')
     parser.add_argument('--hour_agg', type=int, default=6, help='')

@@ -151,9 +151,9 @@ class Macro_critic(nn.Module):
         return value.unsqueeze(dim=1)
 
 
-class Policy(nn.Module):
+class DeepMobility(nn.Module):
     def __init__(self,args, emb, region2loc, d_feature, loclonlat, device, history_len=1e9):
-        super(Policy, self).__init__()
+        super(DeepMobility, self).__init__()
         history_len = int(history_len)
         self.args = args
         self.policy_high = Policy_High(args, emb, d_feature, device, history_len).to(device)

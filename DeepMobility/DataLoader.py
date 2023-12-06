@@ -15,13 +15,10 @@ class DataLoader(object):
         self.args = args
 
     def data_load(self):
-        print('Data loading...')
+        print('Data loading...\n')
         
         with open('data/{}/{}m/data.json'.format(self.args.dataset,self.args.resolution), 'r') as f:
             data_all = json.load(f)
-
-        self.args.training_num = 20
-        print('training_num', self.args.training_num)
 
         data = data_all[:self.args.training_num]
         data_test = data_all[self.args.training_num:self.args.training_num+self.args.evaluate_batch]
@@ -37,7 +34,7 @@ class DataLoader(object):
         data = [[loc for loc in user if loc[0]<=self.args.num_steps] for user in data]
         data_test = [[loc for loc in user if loc[0]<=self.args.num_steps] for user in data_test]
 
-        print('num_days:{}, num_user:{}'.format(self.args.num_days, self.args.user_num))
+        #print('num_days:{}, num_user:{}'.format(self.args.num_days, self.args.user_num))
         
         loc_att = None
 
@@ -90,7 +87,7 @@ class DataLoader(object):
         assert len(region_att[0]) == len(region2loc)
         assert len(region_att[0]) == self.args.total_regions
 
-        print('total_regions:{}, total_locations:{}'.format(self.args.total_regions, self.args.total_locations))
+        #print('total_regions:{}, total_locations:{}'.format(self.args.total_regions, self.args.total_locations))
 
         real_OD = torch.tensor(np.load('data/{}/{}m/OD_{}.npy'.format(self.args.dataset,self.args.resolution,self.args.hour_agg))).float()
         real_OD = real_OD[:int((self.args.num_steps+1)/24)]
@@ -104,7 +101,7 @@ class DataLoader(object):
 
         start = time.time()
 
-        print('Training data preparation...')
+        print('Training data preparation...\n')
 
         t0 = [[i[2] for i in user[:step+1]] + [self.args.total_regions] * (self.args.num_steps-step-1) for user in data for step in range(self.args.num_steps)]
         t1 = [[i[1] for i in user[:step+1]] + [self.args.total_locations] * (self.args.num_steps-step-1) for user in data for step in range(self.args.num_steps)]
@@ -119,7 +116,7 @@ class DataLoader(object):
 
         state_action = TensorDataset(t0, t1, a0, a1, length, length_origin)
 
-        print('process time: {} min'.format(round((end-start)/60.0,3)))
+        #print('process time: {} min'.format(round((end-start)/60.0,3)))
 
         return state_action
 

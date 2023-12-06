@@ -103,7 +103,7 @@ class RolloutStorage(object):
         self.state_low.append(state_low)
         self.actions_high[self.step].copy_(actions_high.unsqueeze(dim=1))
         self.actions_low[self.step].copy_(actions_low.unsqueeze(dim=1))
-        self.action_log_probs_high[self.step].copy_(action_log_probs_high.unsqueeze(dim=1))
+        self.action_log_probs_high[self.step].copy_(action_log_probs_high .unsqueeze(dim=1))
         self.action_log_probs_low[self.step].copy_(action_log_probs_low.unsqueeze(dim=1))
         self.value_preds_high[self.step].copy_(value_preds_high.unsqueeze(dim=1))
         self.value_preds_low[self.step].copy_(value_preds_low.unsqueeze(dim=1))
@@ -112,7 +112,6 @@ class RolloutStorage(object):
         self.masks[self.step].copy_(masks.unsqueeze(dim=1))
         self.length[self.step].copy_(length.unsqueeze(dim=1))
         self.step += 1
-
 
 
     def compute_returns(self,next_value_high, next_value_low, next_value_macro = None):
@@ -184,8 +183,7 @@ class RolloutStorage(object):
 
         num_processes = batch
         
-
-        for step in tqdm(range(self.num_steps-1)):
+        for step in range(self.num_steps-1):
             for index_a in range(self.value_macro.shape[1]):
                 if self.actions_low_macro[step+1,index_a]!=self.actions_low_macro[step,index_a]:
                     flow_id = (step+1) // self.args.hour_agg

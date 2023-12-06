@@ -104,7 +104,7 @@ def policy_high_pretrain(x, actor, args, device, optimizer, criterion):
     num = 0.0
 
 
-    batch_size = 16
+    batch_size = 50
 
     for batch in range(int(len(x)/batch_size)):
         
@@ -134,13 +134,11 @@ def policy_high_pretrain(x, actor, args, device, optimizer, criterion):
     return total_loss / num
 
 def pretrain_together(args,data,expert_state_action,agent, real_OD,device, writer):
-    print('Pretrain actor...')
+    print('Pretrain actor...\n')
     x = torch.tensor([[i[2] for i in u] for u in data]).long()
 
     optimizer = optim.Adam(agent.actor_critic.policy_high.parameters(), lr=3e-3, eps = args.eps)
     criterion = nn.NLLLoss(reduction='sum').to(device)
-
-    print('high training')
 
     for epoch in range(args.actor_high_pretrain_epoch):
         agent.actor_critic.train()
@@ -152,7 +150,6 @@ def pretrain_together(args,data,expert_state_action,agent, real_OD,device, write
 
     optimizer = optim.Adam(agent.actor_critic.policy_low.parameters(), lr=args.lr_pretrain, eps = args.eps)
 
-    print('low training')
     for epoch in range(args.actor_low_pretrain_epoch):
 
         agent.actor_critic.train()
@@ -164,7 +161,6 @@ def pretrain_together(args,data,expert_state_action,agent, real_OD,device, write
 
 
     if args.uncertainty < 1e10:
-        print('Pretrain gravity...')
         optimizer = optim.Adam(agent.actor_critic.policy_high.actor_others.parameters(), lr=1e-2)
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode = 'min',patience=1, min_lr = 1e-5)
 

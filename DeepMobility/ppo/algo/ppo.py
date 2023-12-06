@@ -51,7 +51,7 @@ class PPO():
         with torch.cuda.device("cuda:{}".format(rollouts.args.cuda_id)):
             torch.cuda.empty_cache()
 
-        print('update...')
+        print('\nMacro citic training...')
         
         for epoch in tqdm(range(rollouts.args.macro_critic_epoch)):
 
@@ -250,8 +250,6 @@ class PPO():
                     print('ppo loss nana')
                     exit()
 
-            #ratio_all = torch.cat(ratio_all,dim=0)
-
             if flag==0:
                 if level==0:
                     # mlflow.log_metric('loss_ppo_high_value', value_loss_epoch/num,step=0)
@@ -262,7 +260,6 @@ class PPO():
                     self.writer.add_scalar(tag='actor-critic/loss_ppo_high_action',scalar_value=action_loss_epoch/num)
                     self.writer.add_scalar(tag='actor-critic/loss_ppo_high_entropy',scalar_value=dist_entropy_epoch/num_b)
 
-                    
 
                 elif level==1:
                     # mlflow.log_metric('loss_ppo_low_value', value_loss_epoch/num,step=0)

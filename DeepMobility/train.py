@@ -25,7 +25,7 @@ from Evaluation import evaluate, evaluate_macro
 
 def DeepMobility_train(args, agent, discriminator, data, data_test, expert_state_action, rollouts, evaluation, disc_optimizer, init_prob, region2loc, loc2region, device, model_path, real_OD, writer):
     min_distance_step_jsd, min_distance_jsd, min_radius_jsd, min_duration_jsd, min_dailyloc_jsd = 1e9, 1e9,1e9,1e9,1e9
-    print('############################### Training Start! ###############################')
+    print('############################### Training Start! ###############################\n')
     for itr in range(0,args.num_updates):
         with torch.no_grad():
 
@@ -84,15 +84,15 @@ def DeepMobility_train(args, agent, discriminator, data, data_test, expert_state
             next_value_macro = agent.macro_critic.get_macro_value((state1_save,action_high), length_origin, length).detach().cpu()
 
         if args.with_evaluate:
-            if itr % args.evaluate_epoch==0:
+            if itr % args.evaluate_interval==0:
                 print('Evaluate...')
                 distance_step_jsd, distance_jsd, radius_jsd, duration_jsd, dailyloc_jsd = evaluate(init_prob, region2loc, loc2region, agent.actor_critic, args, device, args.evaluate_batch, evaluation, data_test,  step = itr,model_path = model_path, is_save=True, writer=writer)
                 min_distance_step_jsd, min_distance_jsd, min_radius_jsd, min_duration_jsd, min_dailyloc_jsd = min(distance_step_jsd, min_distance_step_jsd), min(min_distance_jsd, distance_jsd), min(min_radius_jsd, radius_jsd), min(min_duration_jsd, duration_jsd), min(min_dailyloc_jsd, dailyloc_jsd)
                 torch.save(agent.actor_critic.state_dict(), model_path+'model_{}.pkl'.format(itr))
-                OD_fake = evaluate_macro(init_prob, region2loc, loc2region, agent.actor_critic, args, device, real_OD, model_path=model_path, step = itr, total_num=300000, is_save=True, writer=writer)
+                OD_fake = evaluate_macro(init_prob, region2loc, loc2region, agent.actor_critic, args, device, real_OD, model_path=model_path, step = itr, total_num=args.total_OD_num, is_save=True, writer=writer)
                 
 
-        print('Discriminator training...')
+        print('\nDiscriminator training...\n')
         expert_loader = torch.utils.data.DataLoader(dataset=expert_state_action, batch_size = args.gail_batch_size, shuffle=True, drop_last=True)
         gail_epoch = 15 if itr == 0 else args.gail_epoch
 
@@ -124,13 +124,13 @@ def DeepMobility_train(args, agent, discriminator, data, data_test, expert_state
         writer.add_scalar(tag='Train/Q_macro',scalar_value=torch.mean(rollouts.value_macro_combine).item(), global_step=itr)
 
         if itr % args.macro_interval == 0 and not args.no_macro and args.macro_coef>0:
-            print('Macro critic training......')
+            print('Data preparation for macro critic ......\n')
             rollouts.micro2macro(real_OD, model_path, init_prob, region2loc,loc2region,agent.macro_critic,agent.actor_critic,device,itr)
             agent.update_macro_critic(rollouts, model_path)
             rollouts.after_update(level=1)
 
-        print('Actor-critic training...')
-        if args.no_macro and args.macro_coef==0.0:
+        print('\nActor-critic training...\n')
+        if args.no_macro:
             rollouts.compute_returns(next_value_high, next_value_low)
             agent.update(rollouts, level=0, discriminator = discriminator)
             agent.update(rollouts, level=1)
@@ -142,5 +142,7 @@ def DeepMobility_train(args, agent, discriminator, data, data_test, expert_state
             rollouts.compute_returns(next_value_high, next_value_low, next_value_macro)
             agent.update(rollouts, level=0, flag=1) # actor
             agent.update(rollouts, level=1) # flag=0
-        
             rollouts.after_update(level = 0)
+
+
+    print('Finish trianing!')
