@@ -66,5 +66,4 @@ The generated mobility data is saved in ``./gen_data/``
 
 We provide a test demo to illustrate the training process of the model. It only include a samll amount of data with only 1-epoch training. You will see the following logs once you start training our model:
 
-[demo vedio](https://github.com/tsinghua-fib-lab/DeepMobility/blob/main/video/demo.mp4)
-
+https://github.com/tsinghua-fib-lab/DeepMobility/assets/29177088/8c413354-f30d-4e2a-8361-c60078c7016a
