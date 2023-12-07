@@ -27,8 +27,7 @@ We use four datasets to demonstrate the DeepMobility generation framework.
 The first two datasets (DS1, DS2) use the anonymized location record of about 1.8 million users in Beijing, China and 0.32 million users in Shenzhen, China, respectively. 
 The third dataset (DS3) covering Shanghai (China) consists of around 1.9 million anonymized users of China’s major telecom company. 
 The fourth dataset (DS4) of Senegal is based on anonymized call detail records (CDRs) from about 0.3 million users during a two-week period with a temporal resolution of 10 min. 
-We provide the processed data of all four scenarios used in our paper, including [Beijing](DeepMobility/data/beijing/), [Shanghai](DeepMobility/data/shanghai/), [Shenzhen](DeepMobility/data/shenzhen/), 
-and [Senegal](DeepMobility/data/Senegal/). 
+We provide the processed data of all four scenarios used in our paper, including [Beijing](https://en.wikipedia.org/wiki/Beijing), [Shanghai](https://en.wikipedia.org/wiki/Shanghai), [Shenzhen](https://en.wikipedia.org/wiki/Shenzhen), and [Senegal](https://en.wikipedia.org/wiki/Senegal). 
 For each case, we provide the following data:
 * `data.json`: the individual trjaectories
 * `loc2region.json`: the transformation from location index to region index
@@ -38,7 +37,7 @@ For each case, we provide the following data:
 * `RegionIndex2lonlat`: the transformation from Region index to region longitude and latitude
 * `region_attribute.csv`: the attributes of the region, where the attribute name is recorded as the column name
 
-
+To access the datasets, please refer to [data readme](DeepMobility/data/README.md).
 
 ## Model Training
 For example, to train a model for the Shanghai city, run:
