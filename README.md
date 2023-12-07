@@ -37,7 +37,7 @@ For each case, we provide the following data:
 * `RegionIndex2lonlat`: the transformation from Region index to region longitude and latitude
 * `region_attribute.csv`: the attributes of the region, where the attribute name is recorded as the column name
 
-To access the datasets, please refer to [data readme](DeepMobility/data/README.md).
+To access the datasets, please refer to [data readme](https://github.com/tsinghua-fib-lab/DeepMobility/blob/main/data/README.md).
 
 ## Model Training
 For example, to train a model for the Shanghai city, run:
