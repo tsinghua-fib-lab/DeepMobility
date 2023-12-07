@@ -24,6 +24,7 @@ from ppo import RolloutStorage
 from DataLoader import DataLoader
 from Pretrain import pretrain_together
 from Evaluation import Evaluation
+from Generation import generation
 
 import setproctitle
 from utils import *
@@ -35,7 +36,7 @@ warnings.filterwarnings('ignore')
 
 def main(args, TIME):
     
-    print('\nExperiment test demo setup...\n'.format(TIME))
+    #print('\nExperiment test demo setup...\n'.format(TIME))
 
     model_path = './ModelSave/{}/'.format(TIME)
 
@@ -58,7 +59,8 @@ def main(args, TIME):
     dataloader = DataLoader(args)
     data, data_test, region2loc, loc2region, region_att, loc_att, init_prob, loclonlat, LocIndex2lonlat, RegionIndex2lonlat, real_OD = dataloader.data_load()
     
-    expert_state_action = dataloader.ExpertDataset(data)
+    if args.mode=='training':
+        expert_state_action = dataloader.ExpertDataset(data)
 
     print('Model setup...\n')
     embedding_layer = Embedding_Layer(args).to(device)
@@ -80,6 +82,13 @@ def main(args, TIME):
             eps=args.eps,
             max_grad_norm=args.max_grad_norm,
             writer = writer)
+
+    if args.mode=='generating':
+        if not os.path.exists('./gen_data/'):
+            os.mkdir('./gen_data/')
+        generation(init_prob, region2loc, loc2region, actor_critic, args, device, args.pretrained_model_path)
+        print('Generated data has been saved!')
+        return 0
 
 
     # rollouts

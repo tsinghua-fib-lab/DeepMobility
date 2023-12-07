@@ -36,6 +36,7 @@ def get_args():
 
     # configurations
     parser.add_argument('--cuda_id',type=int,default=0, help='')
+    parser.add_argument('--mode',type=str,default='training', help='')
     parser.add_argument('--dataset',type=str,default='shanghai', choices=['beijing','shenzhen','shanghai','Senegal'], required=True)
     parser.add_argument('--total_locations',type=int,default=None, help='number of locations')
     parser.add_argument('--total_regions',type=int,default=None, help='number of regions')
@@ -43,9 +44,9 @@ def get_args():
     parser.add_argument('--run_name', type=str, required=True)
     parser.add_argument('--with_evaluate',action='store_true',default=False,help='')
     parser.add_argument('--model',type=str,default='', help='')
-    parser.add_argument('--machine', type=str, required=True)
-    parser.add_argument('--resolution', type=str, required=True, choices = ['200','500','1000','10000'])
-    parser.add_argument('--param_resolution', type=str, required=True, choices = ['200','500','1000','10000'])
+    parser.add_argument('--machine', type=str, default='machine name', help='')
+    parser.add_argument('--resolution', type=str, default='200')
+    parser.add_argument('--param_resolution', type=str, default='200')
 
     # training parameters
     parser.add_argument('--simulate_batch_size', type=int,default = 128)
@@ -64,7 +65,9 @@ def get_args():
     parser.add_argument('--evaluate_interval', type=int, default=10, help='')
     parser.add_argument('--evaluate_batch', type=int, default=20000, help='')
     parser.add_argument('--total_OD_num', type=int, default=300000, help='')
-   
+    parser.add_argument('--generate_num', type=int, default=30000, help='')
+    parser.add_argument('--pretrained_model_path', type=str, default='', help='')
+
     # ppo
     parser.add_argument('--clip_param',type=float,default=0.2,help='ppo clip parameter (default: 0.2)')
     parser.add_argument('--ppo_epoch', type=int, default=5, help='number of ppo epochs (default: 4)')
